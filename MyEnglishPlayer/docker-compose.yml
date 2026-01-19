@@ -1,0 +1,55 @@
+services:
+  # 1. LLM SERVER (Ollama) - "Мозги"
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sub-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    restart: always
+    # !!! МАГИЯ GPU ДЛЯ OLLAMA !!!
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # 2. TTS SERVER (Kokoro) - "Голос"
+  # МЕНЯЕМ ОБРАЗ НА GPU ВЕРСИЮ
+  kokoro-tts:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest # <--- Было cpu, стало gpu
+    container_name: sub-kokoro
+    ports:
+      - "8880:8880"
+    environment:
+      - TZ=Etc/UTC
+    restart: always
+    # !!! МАГИЯ GPU ДЛЯ KOKORO !!!
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # 3. Web UI (Остается без изменений)
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: sub-webui
+    ports:
+      - "3000:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    volumes:
+      - webui_storage:/app/backend/data
+    restart: always
+
+volumes:
+  ollama_storage:
+  webui_storage:
